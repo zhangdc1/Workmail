@@ -1,0 +1,103 @@
+/**
+ * Run with the registration browser's authenticated, same-origin JSON transport.
+ * Never reads, exports or stores cookies/SK. Never submits checkout/card data.
+ */
+export async function collectClaudeKyc({getJson, expectedEmail, mode='short_first', observedShort=null, preferredOrganization=null, now=()=>new Date()}) {
+  if(typeof getJson!=='function'||!expectedEmail?.includes('@'))throw new Error('需要已登录浏览器的请求方法和登记邮箱');
+  if(!['short_first','long_session','status_only','auto_link'].includes(mode))throw new Error('未知采集模式');
+  const account=await authenticatedAccount(getJson);
+  const email=account?.email_address||account?.email;
+  if(typeof email!=='string'||email.toLowerCase()!==expectedEmail.trim().toLowerCase()) {
+    return {ok:false,state:'identity_unconfirmed',message:'当前浏览器未登录目标账号，或登录邮箱不匹配'};
+  }
+  const organizations=await getJson('/api/organizations');
+  const orgs=Array.isArray(organizations)?organizations:organizations?.organizations;
+  const ids=[...new Set((Array.isArray(orgs)?orgs:[]).map(o=>o?.uuid||o?.organization_uuid||o?.organization_id||o?.id).filter(id=>typeof id==='string'&&/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(id)))];
+  // Follow the organization of the previously confirmed inquiry, rather
+  // than accidentally reporting an unrelated organization's not_required.
+  if(ids.includes(preferredOrganization))ids.sort((a,b)=>Number(b===preferredOrganization)-Number(a===preferredOrganization));
+  else if(preferredOrganization)return {ok:false,state:'organization_missing',message:'已保存的认证组织不在此会话中，未覆盖原记录'};
+  if(!ids.length)return {ok:false,state:'organization_missing',message:'登录已确认，但尚未取得账号组织，请完成官网账号设置'};
+  for(const organization_id of (preferredOrganization?ids.slice(0,1):ids.slice(0,5))) {
+    const path='/api/organizations/'+organization_id+'/kyc_status';
+    let kyc=normalizeKyc(await getJson(path));
+    if(!kyc||typeof kyc!=='object'||!['verified','not_required','in_progress','created','pending','denied','failed','expired'].includes(kyc.status))continue;
+    const originalId=kyc.vendor_inquiry_id;
+    const observed=observedShort?.email?.toLowerCase()===email.toLowerCase()
+      &&observedShort.inquiryId===originalId&&Date.parse(observedShort.capturedAt)>now().getTime()-120000
+      ?oneTimeUrl(observedShort.url):'';
+    let originalShort=observed||oneTimeUrl(kyc.vendor_inquiry_url),renewIssue='';
+    if(mode!=='status_only'&&['in_progress','created','pending'].includes(kyc.status)&&(mode!=='auto_link'||!kyc.vendor_inquiry_url)&&!(mode==='short_first'&&originalShort)&&!longEnough(kyc.vendor_inquiry_url,now())) {
+      // Only renew an existing pending inquiry. This cannot create a checkout-triggered task.
+      try {
+        const renewed=normalizeKyc(await getJson(path+'?refresh_session=true'));
+        if(!renewed||!['verified','not_required','in_progress','created','pending','denied','failed','expired'].includes(renewed.status))throw new Error('无法识别续取响应');
+        kyc=renewed;
+      }
+      catch {if(!originalShort&&mode!=='auto_link')return {ok:false,state:'renew_failed',message:'现有认证会话续取失败，请稍后重新采集'};renewIssue=mode==='auto_link'?'已查到待认证，但官网暂未返回链接；稍后重试。':'未能取得新的会话链接，已保留原始短链。';}
+    }
+    if(!kyc||!['verified','not_required','in_progress','created','pending','denied','failed','expired'].includes(kyc.status))return {ok:false,state:'unknown_response',message:'Claude 返回了无法识别的认证响应'};
+    if(originalId!==kyc.vendor_inquiry_id)originalShort='';
+    originalShort=originalShort||oneTimeUrl(kyc.vendor_inquiry_url);
+    const chosen=mode==='short_first'&&originalShort?originalShort:kyc.vendor_inquiry_url||originalShort;
+    const snapshot={email,organization_id,captured_at:now().toISOString(),kyc:{status:kyc.status,vendor_inquiry_id:kyc.vendor_inquiry_id||'',vendor_inquiry_url:chosen||'',original_inquiry_url:originalShort}};
+    const currentAccount=await authenticatedAccount(getJson);
+    if((currentAccount?.email_address||currentAccount?.email)?.toLowerCase()!==email.toLowerCase())return {ok:false,state:'identity_changed',message:'采集过程中登录账号发生变化，请重新运行'};
+    const state=kyc.status==='not_required'?'not_required_now':kyc.status==='verified'?'passed':oneTimeUrl(chosen)?'short_captured':!kyc.vendor_inquiry_id&&!chosen?'no_inquiry_returned':'captured';
+    const message=state==='short_captured'?(mode==='long_session'?'官网仅返回一次性短链，未延长有效期；请尽快使用':'已提取官网原始短链；有效期由上游决定，请尽快使用'):state==='not_required_now'?'当前未要求 KYC；这不代表未来升级或其他操作不会触发认证':state==='no_inquiry_returned'?'已登录，但尚未返回认证任务；不能凭邮箱生成链接':mode==='long_session'?'已取得上游会话链接；原始短链仍保留，期限以 token 声明及官网实际状态为准':'已采集当前浏览器的认证结果';
+    return {ok:true,state,snapshot,message:renewIssue+message};
+  }
+  return {ok:false,state:'unknown_response',message:'未取得可识别的 KYC 状态，不能判断是否已经触发认证'};
+}
+
+async function authenticatedAccount(getJson){
+  let lastError;
+  for(const path of ['/api/account','/edge-api/bootstrap','/api/bootstrap']){
+    try{
+      const data=await getJson(path),account=data?.account||data?.user||data;
+      if(account?.email_address||account?.email)return account;
+    }catch(error){lastError=error;}
+  }
+  throw new Error('无法确认 Claude 登录邮箱，请检查同一浏览器中的登录状态'+(lastError?'：'+lastError.message:''));
+}
+
+function normalizeKyc(payload){
+  if(!payload||typeof payload!=='object')return payload;
+  const state=String(payload.status||'').toLowerCase();
+  return {...payload,status:['processing','requires_idv','requires_action'].includes(state)?'pending':state};
+}
+
+function oneTimeUrl(value) {
+  try {
+    const u=new URL(value);
+    return u.protocol==='https:'&&['withpersona.com','inquiry.withpersona.com'].includes(u.hostname)
+      &&!u.username&&!u.password&&!u.port&&(u.pathname==='/verify'&&u.searchParams.get('code')||/^\/l\/[A-Za-z0-9_-]{4,200}$/.test(u.pathname))
+      &&!u.searchParams.has('session-token')?u.href:'';
+  } catch {return '';}
+}
+
+function longEnough(value,date) {
+  try {
+    const url=new URL(value);
+    if(url.protocol!=='https:'||!['withpersona.com','inquiry.withpersona.com'].includes(url.hostname)||url.pathname!=='/verify')return false;
+    const token=url.searchParams.get('session-token')||'';
+    const parts=token.split('.');
+    if(parts.length!==3)return false;
+    const encoded=parts[1].replace(/-/g,'+').replace(/_/g,'/');
+    const claims=JSON.parse(atob(encoded.padEnd(Math.ceil(encoded.length/4)*4,'=')));
+    return Number.isInteger(claims.exp)&&claims.exp*1000-date.getTime()>180000;
+  } catch {return false;}
+}
+
+/** Use inside the already-authenticated Claude page, not the workbench page. */
+export async function collectFromCurrentClaudePage(expectedEmail,mode='short_first',observedShort=null) {
+  if(globalThis.location?.origin!=='https://claude.ai')throw new Error('只能在已登录的 Claude 官网页面中采集');
+  const deadline=Date.now()+90000;
+  return collectClaudeKyc({expectedEmail,mode,observedShort,getJson:async path=>{
+    const remaining=deadline-Date.now();
+    if(remaining<=0)throw new Error('Claude 采集超时，请稍后重新运行');
+    const response=await fetch(path,{credentials:'same-origin',redirect:'error',cache:'no-store',headers:{Accept:'application/json'},signal:AbortSignal.timeout(Math.min(15000,remaining))});
+    if(!response.ok)throw new Error('Claude 请求失败（HTTP '+response.status+'）');
+    return response.json();
+  }});
+}

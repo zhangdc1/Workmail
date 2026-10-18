@@ -1,0 +1,33 @@
+{
+  "date": "2026-10-18",
+  "timezone": "Asia/Shanghai",
+  "typecheck": "passed",
+  "productionBuild": "passed",
+  "builtApiAndMigrationsSmoke": "passed",
+  "unitIntegrationTests": {
+    "passed": 26,
+    "files": 4,
+    "database": "isolated PGlite PostgreSQL/WASM",
+    "smtp": "real local TCP, not public Postfix",
+    "upstreamAccounts": "no live third-party queries"
+  },
+  "browser": {
+    "engine": "installed Google Chrome, headless",
+    "passed": 2,
+    "viewports": ["1512x982", "390x844"]
+  },
+  "extensions": {
+    "built": ["full", "compat"],
+    "pacOfflineTests": "passed",
+    "realBrowserInstallAndCapture": "pending"
+  },
+  "compose": {
+    "staticValidation": "passed using placeholders and --no-env-resolution",
+    "linuxEngine": "startup failed: dockerInference socket access error",
+    "imageBuildAndDeployment": "not verified"
+  },
+  "shellSyntax": "passed with Git Bash",
+  "pythonSyntax": "passed via AST",
+  "publicDeliveryAndTls": "pending VPS and DNS",
+  "productionBackupRestore": "not exercised"
+}

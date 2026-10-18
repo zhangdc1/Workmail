@@ -1,0 +1,25 @@
+{
+  email {$ACME_EMAIL}
+}
+{$WEB_HOSTNAME} {
+  header {
+    Strict-Transport-Security "max-age=31536000"
+    X-Content-Type-Options nosniff
+    Referrer-Policy no-referrer
+    Permissions-Policy "camera=(), microphone=(), geolocation=()"
+    Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; frame-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'"
+  }
+  encode zstd gzip
+  reverse_proxy api:3001 {
+    flush_interval -1
+  }
+}
+http://{$MAIL_HOSTNAME} {
+  handle /.well-known/acme-challenge/* {
+    root * /var/www/acme
+    file_server
+  }
+  handle {
+    respond "SMTP certificate validation host" 200
+  }
+}

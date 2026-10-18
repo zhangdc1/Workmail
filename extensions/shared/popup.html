@@ -1,0 +1,6 @@
+<!doctype html><html lang="zh-CN"><meta charset="utf-8"><title>InboxLab 连接器</title><link rel="stylesheet" href="popup.css"><body>
+<header><span class="logo">M</span><div><h1>InboxLab</h1><small>私有平台浏览器连接器</small></div></header>
+<section id="pair"><label>平台地址<input id="origin" placeholder="https://mail.your-domain.com"></label><label>五分钟一次性配对码<input id="code" placeholder="在平台「浏览器连接器」生成" autocomplete="off"></label><p>请核实这是你的私有平台。连接后仅在核对目标邮箱后采集 Session。</p><button id="connect">确认平台并连接</button></section>
+<section id="connected" hidden><div class="status" id="platform"></div><label>目标账号<select id="accounts"><option value="">选择目标账号</option></select></label><div class="actions"><button id="refresh" class="secondary">刷新账号</button><button id="capture">核对邮箱并采集</button></div><label class="check"><input id="auto" type="checkbox">登录后自动回填 Session</label><p>暂停会停止 Cookie 与导航监听；切换目标账号也会自动暂停。</p><button id="disconnect" class="secondary">断开此平台连接</button></section>
+<section id="proxy" hidden><h2>无痕代理</h2><p>作用于全部无痕标签，不是每标签独立代理。先关闭已有无痕窗口；失败不回退直连。</p><div class="actions"><button id="proxy-on">验证并启用</button><button id="proxy-off" class="secondary">关闭代理</button></div><small id="proxy-status"></small></section>
+<output id="result" role="status"></output><footer>只连接主动确认的平台 · 不存储明文 Session</footer><script type="module" src="popup.mjs"></script></body></html>

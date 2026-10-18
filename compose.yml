@@ -1,0 +1,156 @@
+name: inboxlab
+x-app: &app
+  image: inboxlab:local
+  build: .
+  restart: unless-stopped
+  env_file: .env.production
+  environment: &app-env
+    NODE_ENV: production
+    HOST: 0.0.0.0
+    PORT: 3001
+    DATABASE_MODE: postgres
+    DATABASE_URL: postgresql://inboxlab:${POSTGRES_PASSWORD:?generate .env.production}@postgres:5432/inboxlab
+    DATA_DIR: /data/mail
+    SMTP_HOST: 0.0.0.0
+    INTEGRATION_PYTHON: /opt/integration/bin/python
+  volumes:
+    - ./runtime/mail:/data/mail
+  networks: [internal, outbound]
+  depends_on:
+    postgres: { condition: service_healthy }
+  security_opt: [no-new-privileges:true]
+  logging: { driver: json-file, options: { max-size: "10m", max-file: "3" } }
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: inboxlab
+      POSTGRES_USER: inboxlab
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTFIX_PASSWORD: ${POSTFIX_PASSWORD}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./deploy/postgres-init.sh:/docker-entrypoint-initdb.d/10-postfix.sh:ro
+    networks: [internal]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U inboxlab -d inboxlab"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    shm_size: 128mb
+    logging: { driver: json-file, options: { max-size: "10m", max-file: "3" } }
+  migrate:
+    <<: *app
+    restart: "no"
+    command: ["node","dist/scripts/migrate.js"]
+    profiles: [tools]
+  bootstrap:
+    <<: *app
+    restart: "no"
+    command: ["node","dist/scripts/bootstrap.js"]
+    profiles: [tools]
+  maintenance:
+    <<: *app
+    restart: "no"
+    command: ["node","dist/scripts/storage-maintenance.js"]
+    profiles: [tools]
+  api:
+    <<: *app
+    environment:
+      <<: *app-env
+      TRUST_PROXY_CIDRS: ${CADDY_EDGE_IP:-172.30.84.2}/32
+    networks: [internal, outbound, edge]
+    command: ["node","dist/apps/api/src/server.js"]
+    healthcheck:
+      test: ["CMD","node","-e","fetch('http://127.0.0.1:3001/api/v1/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 20s
+      timeout: 5s
+      retries: 3
+  smtp:
+    <<: *app
+    command: ["node","dist/apps/api/src/smtp.js"]
+    healthcheck:
+      test: ["CMD","node","-e","const s=require('net').connect(2525,'127.0.0.1');s.once('data',d=>{s.end();process.exit(d.toString().startsWith('220')?0:1)});s.once('error',()=>process.exit(1))"]
+      interval: 20s
+      timeout: 5s
+      retries: 3
+  worker:
+    <<: *app
+    command: ["node","dist/apps/api/src/worker.js"]
+  rspamd:
+    build: deploy/rspamd
+    restart: unless-stopped
+    networks: [internal, outbound]
+    volumes: [rspamddata:/var/lib/rspamd]
+    logging: { driver: json-file, options: { max-size: "10m", max-file: "3" } }
+  postfix:
+    build: deploy/postfix
+    restart: unless-stopped
+    profiles: [mail]
+    ports: ["25:25"]
+    environment:
+      MAIL_HOSTNAME: ${MAIL_HOSTNAME}
+      POSTFIX_PASSWORD: ${POSTFIX_PASSWORD}
+    volumes:
+      - postfixqueue:/var/spool/postfix
+      - smtp_certs:/etc/letsencrypt:ro
+    networks: [internal, outbound]
+    depends_on:
+      postgres: { condition: service_healthy }
+      smtp: { condition: service_started }
+      rspamd: { condition: service_started }
+    healthcheck:
+      test: ["CMD-SHELL","postfix status && test -s /etc/letsencrypt/live/$$MAIL_HOSTNAME/fullchain.pem"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    logging: { driver: json-file, options: { max-size: "10m", max-file: "3" } }
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    environment:
+      WEB_HOSTNAME: ${WEB_HOSTNAME}
+      MAIL_HOSTNAME: ${MAIL_HOSTNAME}
+      ACME_EMAIL: ${ACME_EMAIL}
+    ports: ["80:80","443:443"]
+    networks:
+      edge:
+        ipv4_address: ${CADDY_EDGE_IP:-172.30.84.2}
+      outbound: {}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddydata:/data
+      - caddyconfig:/config
+      - acme_webroot:/var/www/acme:ro
+    depends_on: [api]
+    logging: { driver: json-file, options: { max-size: "10m", max-file: "3" } }
+  certbot:
+    image: certbot/certbot:v3.2.0
+    profiles: [tools]
+    volumes: [smtp_certs:/etc/letsencrypt, acme_webroot:/var/www/acme]
+    networks: [outbound]
+  cert-renew:
+    image: certbot/certbot:v3.2.0
+    profiles: [mail]
+    restart: unless-stopped
+    entrypoint: /bin/sh
+    command: ["-c","trap 'exit' TERM INT; while :; do certbot renew --webroot -w /var/www/acme --quiet; sleep 43200 & wait $$!; done"]
+    volumes: [smtp_certs:/etc/letsencrypt, acme_webroot:/var/www/acme]
+    networks: [outbound]
+volumes:
+  pgdata:
+  postfixqueue:
+  smtp_certs:
+  acme_webroot:
+  caddydata:
+  caddyconfig:
+  rspamddata:
+networks:
+  internal: { internal: true }
+  outbound: {}
+  edge:
+    internal: true
+    ipam:
+      config:
+        - subnet: ${EDGE_SUBNET:-172.30.84.0/29}

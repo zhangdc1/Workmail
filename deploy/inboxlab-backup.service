@@ -1,0 +1,9 @@
+[Unit]
+Description=InboxLab consistent PostgreSQL and mail backup
+Requires=docker.service
+After=docker.service
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/inboxlab
+ExecStart=/bin/bash /opt/inboxlab/deploy/backup.sh
+UMask=0077

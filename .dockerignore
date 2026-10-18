@@ -1,0 +1,16 @@
+node_modules
+data
+runtime
+.env
+.env.*
+!.env.example
+dist
+test-results
+playwright-report
+backups
+.git
+*.zip
+.local
+artifacts
+*.log
+runtime-backup.lock

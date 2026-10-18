@@ -1,0 +1,53 @@
+import { test, expect } from "@playwright/test";
+import { readFileSync, mkdirSync } from "node:fs";
+const env = Object.fromEntries(readFileSync(".env", "utf8").split(/\r?\n/).filter(x => x.includes("=")).map(x => [x.slice(0,x.indexOf("=")),x.slice(x.indexOf("=")+1)]));
+mkdirSync("artifacts/screenshots", { recursive: true });
+test("desktop: real login, navigation, inbox and screenshots", async ({ page }) => {
+  const errors: string[] = []; page.on("pageerror", e => errors.push(e.message));
+  await page.goto("/");
+  await expect(page.getByRole("heading", { name: "欢迎回来" })).toBeVisible();
+  await page.screenshot({ path: "artifacts/screenshots/login-desktop.png", fullPage: true });
+  await page.getByPlaceholder("输入管理员或成员账号").fill(env.BOOTSTRAP_USERNAME);
+  await page.getByPlaceholder("输入你的密码").fill(env.BOOTSTRAP_PASSWORD);
+  await page.getByRole("button", { name: "登录工作空间" }).click();
+  await expect(page.getByRole("heading", { name: "让每一封来信，都有归属。" })).toBeVisible();
+  await expect(page.locator(".stat-value").first()).toContainText("2");
+  await page.screenshot({ path: "artifacts/screenshots/dashboard-desktop.png", fullPage: true });
+  await page.getByRole("link", { name: "统一收件箱", exact: true }).click();
+  await expect(page.locator(".message-row").first()).toBeVisible();
+  await page.locator(".message-row").filter({ hasText: "638201" }).click();
+  await expect(page.locator(".otp-card")).toContainText("638201");
+  await expect(page.getByTitle("隔离邮件正文")).toBeVisible();
+  await page.screenshot({ path: "artifacts/screenshots/inbox-desktop.png", fullPage: true });
+  await page.getByRole("link", { name: "域名与接入", exact: true }).click();
+  await expect(page.locator(".domain-card")).toHaveCount(2);
+  await page.screenshot({ path: "artifacts/screenshots/domains-desktop.png", fullPage: true });
+  await page.getByRole("link", { name: "账号与认证", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "账号与认证", exact: true })).toBeVisible();
+  await expect(page.locator("tbody tr")).toHaveCount(5);
+  await page.screenshot({ path: "artifacts/screenshots/accounts-desktop.png", fullPage: true });
+  for (const name of ["团队与权限","任务中心","系统设置","浏览器连接器"]) {
+    await page.getByRole("link", { name, exact: true }).click();
+    await expect(page.getByRole("heading", { name, exact: true })).toBeVisible();
+    await expect(page.locator(".error-state")).toHaveCount(0);
+  }
+  expect(errors).toEqual([]);
+});
+test("mobile: navigation, list/detail switching and no page overflow", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/");
+  await page.getByPlaceholder("输入管理员或成员账号").fill(env.BOOTSTRAP_USERNAME);
+  await page.getByPlaceholder("输入你的密码").fill(env.BOOTSTRAP_PASSWORD);
+  await page.getByRole("button", { name: "登录工作空间" }).click();
+  await expect(page.getByRole("heading", { name: "让每一封来信，都有归属。" })).toBeVisible();
+  await page.screenshot({ path: "artifacts/screenshots/dashboard-mobile.png", fullPage: true });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.getByRole("button", { name: "打开导航" }).click();
+  await page.getByRole("link", { name: "统一收件箱", exact: true }).click();
+  await page.locator(".message-row").first().click();
+  await expect(page.getByRole("button", { name: "返回邮件列表" })).toBeVisible();
+  await page.screenshot({ path: "artifacts/screenshots/inbox-mobile.png", fullPage: true });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.getByRole("button", { name: "返回邮件列表" }).click();
+  await expect(page.locator(".message-row").first()).toBeVisible();
+});
