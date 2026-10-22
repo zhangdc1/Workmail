@@ -6,6 +6,7 @@ import { Toaster } from "sonner";
 import { queryClient } from "./lib/api";
 import App from "./App";
 import "./style.css";
+import "./copy-api.css";
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode><QueryClientProvider client={queryClient}><BrowserRouter><App /><Toaster richColors position="top-right" closeButton /></BrowserRouter></QueryClientProvider></React.StrictMode>,
 );

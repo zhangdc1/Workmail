@@ -61,6 +61,12 @@ python -m venv .local/integration
 - 一次性扩展配对；完整版/兼容版共享核心，平台地址可配置，暂停移除监听。
 - Docker Compose、Caddy、Postfix、基础 Rspamd、SMTP 证书续期、每日备份及空环境恢复脚本。
 
+## API 与脚本接入
+
+登录后进入侧栏“API 调用文档”（`/api-guide`），可复制调用示例；Swagger 为 `/api/docs`，OpenAPI 为 `/api/v1/openapi.json`。接口使用登录 Cookie，写请求还需 `X-CSRF-Token`，不支持通用 Bearer API Key。
+
+完整说明见 `docs/API.md`；Node.js 24 无依赖调用示例为 `scripts/api-example.mjs`。邮箱地址、需登录的收件链接、分享链接及邮件正文链接均提供点击复制；复制不会访问链接。
+
 ## 开发与检查
 
 ```powershell

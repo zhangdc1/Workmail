@@ -23,7 +23,31 @@ export async function act(fn: () => Promise<unknown>, message = "操作成功") 
   try { const data = await fn(); if (message) toast.success(message); refresh(); return data; }
   catch (error) { toast.error(error instanceof Error ? error.message : "操作失败"); throw error; }
 }
-export function copy(value: string) { void navigator.clipboard.writeText(value).then(() => toast.success("已复制到剪贴板")).catch(() => toast.error("复制失败，请手动复制")); }
+export async function copy(value: string): Promise<boolean> {
+  try {
+    if (!navigator.clipboard?.writeText) throw new Error("Clipboard unavailable");
+    await navigator.clipboard.writeText(value);
+  } catch {
+    const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const selection = document.getSelection();
+    const ranges = selection ? Array.from({ length: selection.rangeCount }, (_, i) => selection.getRangeAt(i).cloneRange()) : [];
+    const textarea = document.createElement("textarea");
+    textarea.value = value;
+    textarea.readOnly = true;
+    textarea.style.cssText = "position:fixed;top:0;left:0;opacity:0;pointer-events:none";
+    // Stay inside an open dialog's focus scope.
+    (previous?.closest('[role="dialog"]') || document.body).appendChild(textarea);
+    let success = false;
+    try { textarea.select(); success = document.execCommand("copy"); } catch {}
+    finally {
+      textarea.remove(); previous?.focus({ preventScroll: true });
+      if (selection) { selection.removeAllRanges(); ranges.forEach(range => selection.addRange(range)); }
+    }
+    if (!success) { toast.error("复制失败，请选中文字手动复制"); return false; }
+  }
+  toast.success("已复制到剪贴板");
+  return true;
+}
 export function bytes(value: number) {
   if (value >= 1073741824) return (value / 1073741824).toFixed(1) + " GB";
   if (value >= 1048576) return (value / 1048576).toFixed(1) + " MB";

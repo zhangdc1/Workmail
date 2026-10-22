@@ -17,6 +17,7 @@ import { accountRoutes } from "./routes/accounts.js";
 import { shareRoutes } from "./routes/shares.js";
 import { dashboardRoutes } from "./routes/dashboard.js";
 import { extensionRoutes } from "./routes/extensions.js";
+import { documentRoute } from "./api-docs.js";
 export async function makeApp(ctx: Context, logger = false) {
   const { db, config } = ctx;
   const app = Fastify({
@@ -29,7 +30,19 @@ export async function makeApp(ctx: Context, logger = false) {
   await app.register(cookie);
   await app.register(rateLimit, { max: 300, timeWindow: "1 minute", allowList: [] });
   await app.register(swagger, {
-    openapi: { info: { title: "InboxLab API", version: "1.0.0" }, servers: [{ url: config.origin }], components: { securitySchemes: { cookieAuth: { type: "apiKey", in: "cookie", name: "inboxlab_session" } } } },
+    openapi: {
+      info: {
+        title: "InboxLab API", version: "1.0.0",
+        description: "调用指南见网站 /api-guide。基础路径 /api/v1。先 POST /api/v1/auth/login，保存响应 Set-Cookie 和 csrf；GET 携带 Cookie，POST/PATCH/PUT/DELETE 额外携带 X-CSRF-Token。无通用 Bearer API Key；扩展令牌仅用于连接器。Swagger 与网站同源，已登录的浏览器自动携带 Cookie；写操作需在 Authorize 的 csrfToken 中填写当前登录会话的 csrf（可通过 GET /api/v1/auth/session 获取）。请勿在 cookieAuth 中粘贴密码。",
+      },
+      servers: [{ url: config.origin }],
+      components: { securitySchemes: {
+        cookieAuth: { type: "apiKey", in: "cookie", name: "inboxlab_session", description: "浏览器使用当前登录 Cookie；脚本需先调用登录接口并保留 Cookie。" },
+        csrfToken: { type: "apiKey", in: "header", name: "X-CSRF-Token", description: "登录或 session 接口返回的 csrf；只在写请求使用。" },
+        extensionToken: { type: "http", scheme: "bearer", description: "仅用于连接器接口，不能调用邮箱或邮件接口。" },
+      } },
+    },
+    transform: documentRoute,
   });
   app.addHook("onRequest", async (req, reply) => {
     reply.header("X-Content-Type-Options", "nosniff").header("Referrer-Policy", "no-referrer").header("X-Frame-Options", "DENY");

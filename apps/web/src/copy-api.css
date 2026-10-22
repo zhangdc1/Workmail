@@ -1,0 +1,34 @@
+.copy-actions{display:inline-flex;align-items:center;flex-shrink:0;gap:2px}
+.copy-actions .btn-icon{width:29px;height:29px}
+.cell-address>.copy-actions{margin-left:auto}
+.tree-mailbox-row{display:flex;align-items:center;min-width:0}
+.tree-mailbox-row>.tree-mailbox{flex:1;min-width:0}
+.tree-mailbox-row>.btn-icon{width:25px;height:28px;flex-shrink:0;color:#6e8ab2}
+.recipient-copy{display:flex;gap:5px;align-items:center;flex-wrap:wrap;font-size:11px;overflow-wrap:anywhere}
+.recipient-copy>span{min-width:0}
+.message-address-copy.btn-icon{height:23px;width:23px}
+.mail-links{border:1px solid #dde8f7;border-radius:8px;background:#f8fbff;padding:12px;margin:16px 0;min-width:0}
+.mail-links-heading{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:11px;font-weight:600;color:#5276a9}
+.mail-links>p{line-height:1.8;margin:3px 0 8px}
+.mail-link-list{max-height:260px;overflow:auto}
+.mail-link-row{display:flex;align-items:center;gap:8px;padding:8px 0;border-top:1px solid #e5edf8}
+.mail-link-row>a{display:block;min-width:0;flex:1;overflow-wrap:anywhere;font-size:11px;color:#2563eb;line-height:1.7}
+.mail-link-row>a>svg{display:inline;margin-left:4px;vertical-align:middle}
+.mail-link-row>.btn{flex-shrink:0;font-size:10px;padding:0 7px;min-height:29px}
+.share-title{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:27px 0}
+.share-title h1{font-size:22px;overflow-wrap:anywhere;min-width:0}
+.share-reader .mail-reader{padding:0;min-width:0}
+.result-copy-all{display:flex;justify-content:flex-end;margin-bottom:10px}
+.result-list>div>.copy-actions{margin-left:auto}
+.result-list>div>span{overflow-wrap:anywhere;min-width:0}
+.api-guide{min-width:0}
+.api-guide>.card{margin-bottom:22px}
+.api-guide h2{font-size:16px;margin:0}
+.api-intro h3{font-size:13px;margin-top:20px}
+.api-base{display:flex;align-items:center;gap:12px;flex-wrap:wrap;background:#f5f8fd;padding:12px 15px;border-radius:8px;margin-top:15px}
+.api-base code{color:#2563eb;font-size:13px;overflow-wrap:anywhere}
+.api-guide pre{margin:0;padding:22px;background:#f5f8fd;color:#334b6c;font-size:12px;line-height:1.9;overflow:auto;max-height:560px;border-radius:0 0 10px 10px}
+.api-guide td{vertical-align:top;line-height:1.9}
+.api-guide td code{font-size:11px;overflow-wrap:anywhere}
+.api-notes p{font-size:12px;line-height:1.9;color:#7185a2;margin-top:14px;overflow-wrap:anywhere}
+@media(max-width:580px){.mail-link-row{gap:4px}.share-title h1{font-size:17px}.api-guide pre{padding:15px;font-size:11px}.api-guide .card-heading{gap:8px;flex-wrap:wrap}.api-guide .page-header .header-actions{justify-content:flex-start}.share-reader{padding:18px}}

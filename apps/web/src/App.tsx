@@ -16,6 +16,7 @@ const SystemPage = lazy(() => import("./pages/Management").then(m => ({ default:
 const TasksPage = lazy(() => import("./pages/Management").then(m => ({ default: m.TasksPage })));
 const ExtensionsPage = lazy(() => import("./pages/Management").then(m => ({ default: m.ExtensionsPage })));
 const SharePage = lazy(() => import("./pages/Management").then(m => ({ default: m.SharePage })));
+const ApiGuidePage = lazy(() => import("./pages/ApiGuide").then(m => ({ default: m.ApiGuidePage })));
 const SessionContext = createContext<User | null>(null);
 export const useUser = () => useContext(SessionContext)!;
 const navigation = [
@@ -26,6 +27,7 @@ const navigation = [
   { to: "/accounts", label: "账号与认证", icon: ShieldCheck, group: "business" },
   { to: "/tasks", label: "任务中心", icon: Workflow, group: "business" },
   { to: "/extensions", label: "浏览器连接器", icon: Command, group: "business" },
+  { to: "/api-guide", label: "API 调用文档", icon: CircleHelp, group: "business" },
   { to: "/users", label: "团队与权限", icon: Users, group: "admin" },
   { to: "/settings", label: "系统设置", icon: Settings2, group: "admin" },
 ];
@@ -73,6 +75,7 @@ function Shell({ user }: { user: User }) {
         <Route path="/mailboxes" element={<MailboxesPage />} /><Route path="/accounts" element={<AccountsPage />} />
         <Route path="/users" element={<UsersPage />} /><Route path="/settings" element={<SystemPage />} />
         <Route path="/tasks" element={<TasksPage />} /><Route path="/extensions" element={<ExtensionsPage />} />
+        <Route path="/api-guide" element={<ApiGuidePage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes></Suspense></main><footer className="app-footer"><span>InboxLab <span className="footer-dot">·</span> 私有域名邮箱工作台</span><span><span className="live-dot" /> {window.location.protocol === "https:" ? "HTTPS 连接" : "本地开发连接"} <span className="footer-dot">·</span> v1.0.0</span></footer>
     </div></div></SessionContext.Provider>;

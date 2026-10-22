@@ -11,7 +11,8 @@ test("desktop: real login, navigation, inbox and screenshots", async ({ page }) 
   await page.getByPlaceholder("输入你的密码").fill(env.BOOTSTRAP_PASSWORD);
   await page.getByRole("button", { name: "登录工作空间" }).click();
   await expect(page.getByRole("heading", { name: "让每一封来信，都有归属。" })).toBeVisible();
-  await expect(page.locator(".stat-value").first()).toContainText("2");
+  const dashboard = await (await page.request.get("/api/v1/dashboard")).json();
+  await expect(page.locator(".stat-value").first()).toContainText(String(dashboard.domains));
   await page.screenshot({ path: "artifacts/screenshots/dashboard-desktop.png", fullPage: true });
   await page.getByRole("link", { name: "统一收件箱", exact: true }).click();
   await expect(page.locator(".message-row").first()).toBeVisible();
@@ -20,11 +21,13 @@ test("desktop: real login, navigation, inbox and screenshots", async ({ page }) 
   await expect(page.getByTitle("隔离邮件正文")).toBeVisible();
   await page.screenshot({ path: "artifacts/screenshots/inbox-desktop.png", fullPage: true });
   await page.getByRole("link", { name: "域名与接入", exact: true }).click();
-  await expect(page.locator(".domain-card")).toHaveCount(2);
+  const domains = await (await page.request.get("/api/v1/domains")).json();
+  await expect(page.locator(".domain-card")).toHaveCount(domains.items.length);
   await page.screenshot({ path: "artifacts/screenshots/domains-desktop.png", fullPage: true });
   await page.getByRole("link", { name: "账号与认证", exact: true }).click();
   await expect(page.getByRole("heading", { name: "账号与认证", exact: true })).toBeVisible();
-  await expect(page.locator("tbody tr")).toHaveCount(5);
+  const accounts = await (await page.request.get("/api/v1/accounts")).json();
+  await expect(page.locator("tbody tr")).toHaveCount(accounts.items.length);
   await page.screenshot({ path: "artifacts/screenshots/accounts-desktop.png", fullPage: true });
   for (const name of ["团队与权限","任务中心","系统设置","浏览器连接器"]) {
     await page.getByRole("link", { name, exact: true }).click();

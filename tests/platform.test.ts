@@ -42,6 +42,21 @@ beforeAll(async () => {
 });
 afterAll(async () => { await app.close(); await db.close(); await rm(root, { recursive: true, force: true }); });
 describe("authentication and validation", () => {
+  it("serves authenticated Swagger and accurate OpenAPI auth/query documentation", async () => {
+    expect((await request("GET", "/openapi.json")).statusCode).toBe(401);
+    const res = await request("GET", "/openapi.json", ad);
+    expect(res.statusCode, res.body).toBe(200);
+    const spec = res.json();
+    expect(spec.components.securitySchemes.csrfToken.name).toBe("X-CSRF-Token");
+    expect(spec.paths["/api/v1/auth/login"].post.security).toEqual([]);
+    expect(spec.paths["/api/v1/mailboxes"].post.security).toEqual([{ cookieAuth: [], csrfToken: [] }]);
+    expect(spec.paths["/api/v1/messages"].get.parameters.map((p: any) => p.name)).toEqual(
+      expect.arrayContaining(["mailboxId", "filter", "pageSize", "q"]),
+    );
+    const swagger = await app.inject({ method: "GET", url: "/api/docs/", headers: { cookie: ad.cookie } });
+    expect(swagger.statusCode).toBe(200);
+    expect(swagger.body).toContain("swagger");
+  });
   it("requires session and CSRF; rejects foreign origin", async () => {
     expect((await request("GET", "/mailboxes")).statusCode).toBe(401);
     expect((await request("POST", "/domains", { ...ad, csrf: "invalid" }, { names: ["evil.test"] })).statusCode).toBe(403);
