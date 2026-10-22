@@ -4,9 +4,9 @@
 
 ## 交付状态
 
-截至 2026-10-18，已实现可运行的前后端、数据库迁移、内部 SMTP、邮件解析 Worker、账号与权限、分享、认证台账、两套扩展源码、部署与备份脚本。
+截至 2026-10-23，前后端、生产 PostgreSQL、Postfix 收件、Worker、HTTPS、SMTP 证书续期及备份恢复已部署验证；API 调用指南和邮箱/邮件链接一键复制已上线。
 
-本地使用真实 SQL 执行、TCP SMTP 和 Chromium 浏览器验证。开发用 PGlite 不等于生产 PostgreSQL；开发样本不等于公网来信。已尝试启动 Docker Desktop，但 Linux 引擎被 dockerInference 套接字初始化错误阻塞；容器部署、公网 Postfix/Rspamd/TLS、真实第三方账号查询、用户浏览器扩展安装与代理以及生产备份恢复仍待验收。详见 `docs/ACCEPTANCE.md`。
+生产验证记录见 `docs/PRODUCTION-2026-10-22.md`；本次发布与复核步骤见 `docs/RELEASE-2026-10-23-API-COPY.md`。开发用 PGlite 不等于生产 PostgreSQL，测试邮件不等于真实服务商投递。第三方账号查询、用户实际浏览器扩展及其他未完成验收仍按文档分别记录，不以模拟结果替代。
 
 ## 本地启动
 
