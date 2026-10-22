@@ -20,5 +20,8 @@ SESSION_HOURS=24
 SMTP_PORT=2525
 SMTP_MAX_BYTES=10485760
 ALLOW_PRIVATE_PROXY=false
+EDGE_SUBNET=172.30.84.0/29
+CADDY_EDGE_IP=172.30.84.2
+API_EDGE_IP=172.30.84.3
 `, { mode: 0o600 });
 console.log("已创建 .env.production，随机密码和独立密钥仅写入文件，未输出到日志。");

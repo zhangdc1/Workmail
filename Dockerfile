@@ -16,7 +16,10 @@ COPY --from=build /app/package*.json ./
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/apps/api/migrations ./apps/api/migrations
 COPY --from=build /app/integrations ./integrations
-RUN mkdir -p /data/mail && chown -R node:node /data /app
+# Only persistent mail data needs to be writable by the runtime user.
+# Keep application code/dependencies root-owned and avoid copying all layers
+# merely to recursively change ownership on low-I/O VPS disks.
+RUN mkdir -p /data/mail && chown node:node /data /data/mail
 USER node
 ENTRYPOINT ["/usr/bin/tini","--"]
 CMD ["node","dist/apps/api/src/server.js"]

@@ -6,7 +6,10 @@ import type { Context } from "./context.js";
 import type { Executor } from "./db/index.js";
 const blocked = new BlockList();
 for (const [network, prefix] of [["0.0.0.0", 8], ["10.0.0.0", 8], ["127.0.0.0", 8], ["169.254.0.0", 16], ["172.16.0.0", 12], ["192.168.0.0", 16], ["100.64.0.0", 10], ["224.0.0.0", 4], ["240.0.0.0", 4]] as const) blocked.addSubnet(network, prefix, "ipv4");
-blocked.addAddress("::", "ipv6"); blocked.addAddress("::1", "ipv6"); blocked.addSubnet("fc00::", 7, "ipv6"); blocked.addSubnet("fe80::", 10, "ipv6"); blocked.addSubnet("ff00::", 8, "ipv6"); blocked.addSubnet("::ffff:0:0", 96, "ipv6");
+// BlockList also matches IPv4 against IPv4-mapped IPv6 ranges. Keeping the
+// families separate avoids ::ffff:0:0/96 accidentally rejecting every IPv4.
+const blockedV6 = new BlockList();
+blockedV6.addAddress("::", "ipv6"); blockedV6.addAddress("::1", "ipv6"); blockedV6.addSubnet("fc00::", 7, "ipv6"); blockedV6.addSubnet("fe80::", 10, "ipv6"); blockedV6.addSubnet("ff00::", 8, "ipv6"); blockedV6.addSubnet("::ffff:0:0", 96, "ipv6");
 export function normalizeSession(input: string) {
   const raw = input.trim();
   const match = raw.match(/(?:^|[;\s])sessionKey(?:V3LC|LC)?=([A-Za-z0-9._~-]+)/);
@@ -27,7 +30,7 @@ export async function normalizeProxy(input: string, allowPrivate = false) {
   const host = url.hostname.replace(/^\[|\]$/g, "");
   const answers = isIP(host) ? [{ address: host, family: isIP(host) }] : await lookup(host, { all: true }).catch(() => []);
   if (!answers.length) throw badRequest("代理主机无法解析");
-  if (!allowPrivate && answers.some(x => blocked.check(x.address, x.family === 6 ? "ipv6" : "ipv4"))) throw badRequest("代理必须使用可公开路由的地址");
+  if (!allowPrivate && answers.some(x => x.family === 6 ? blockedV6.check(x.address, "ipv6") : blocked.check(x.address, "ipv4"))) throw badRequest("代理必须使用可公开路由的地址");
   // Pin numeric host after validation to prevent DNS rebinding between checks.
   url.hostname = answers[0].family === 6 ? `[${answers[0].address}]` : answers[0].address;
   const auth = url.username ? `${url.username}${url.password ? ":" + url.password : ""}@` : "";

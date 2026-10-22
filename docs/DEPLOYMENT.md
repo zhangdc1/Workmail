@@ -1,10 +1,10 @@
 # Ubuntu 生产部署与运行手册
 
-此文档是交付运行步骤，不是已完成的公网部署记录。当前机器已尝试启动 Docker Desktop，但 Linux 引擎被 dockerInference 套接字初始化错误阻塞，需修复引擎或在可用 VPS 上执行完整验收；没有执行 Docker 恢复出厂设置或删除数据。
+此文档提供通用部署步骤。2026-10-22 的实际服务器部署和验收进度单独记录于 `PRODUCTION-2026-10-22.md`；不要把本地测试或健康检查等同于全部公网收件验收通过。
 
 ## 1. 前提
 
-- 目标 Ubuntu 24.04 LTS，2 核/4 GB/至少 40 GB SSD，公网 IPv4，时间同步。
+- 目标 Ubuntu 22.04/24.04 LTS，2 核/4 GB/至少 40 GB SSD，公网 IPv4，时间同步。
 - 已安装 Docker Engine 与 Compose 插件；`docker info`、`docker compose version` 成功。
 - 公网允许 TCP 25 入站、80、443；宿主机没有其他服务占用这些端口。
 - SSH 保留管理来源访问规则，不要在调整防火墙时锁掉管理连接。
@@ -38,7 +38,7 @@ sudo install -d -m 700 -o 1000 -g 1000 runtime/mail
 
 `.env.production` 中有随机管理员密码、数据库密码、Postfix 独立只读密码、独立 32 字节加密密钥。通过安全途径单独保存密钥和配置；不要在终端共享或日志中展开全部环境变量。
 
-默认 Caddy 专用内部网段 `172.30.84.0/29`、Caddy 地址 `172.30.84.2`。如与已有网段冲突，在 `.env.production` 同时调整 `EDGE_SUBNET` 和 `CADDY_EDGE_IP`。API 仅信任该 Caddy 地址提供的转发信息；不要改成信任所有代理。
+默认 Caddy 专用内部网段 `172.30.84.0/29`、Caddy 地址 `172.30.84.2`、API 地址 `172.30.84.3`。如与已有网段冲突，在 `.env.production` 同时调整 `EDGE_SUBNET`、`CADDY_EDGE_IP` 和 `API_EDGE_IP`，确保两个容器地址在该网段内且不重复。API 仅信任 `CADDY_EDGE_IP` 提供的转发信息；不要改成信任所有代理。
 
 约定下面每条 Compose 命令都带 `--env-file .env.production`。此参数不仅供容器读取，还用于 Compose 密码和主机名插值，不能省略或改用开发 `.env`。
 
@@ -86,7 +86,7 @@ docker compose --env-file .env.production --profile mail ps
 Postfix 没有证书时拒绝启动，不以临时自签名证书冒充上线。Certbot 每 12 小时检查续期；Postfix 每 5 分钟检查证书摘要并平滑 reload。后续验证一次续期演练：
 
 ```bash
-docker compose --env-file .env.production run --rm certbot renew --dry-run
+docker compose --env-file .env.production run --rm certbot renew --dry-run --no-random-sleep-on-renew
 ```
 
 仅收件工作台不需要配置用户 SMTP AUTH、发信服务或 IMAP。公网仅发布 25/80/443。PostgreSQL、2525 内部 SMTP、Rspamd、Worker 不发布主机端口。

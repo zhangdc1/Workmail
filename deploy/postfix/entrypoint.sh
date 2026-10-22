@@ -18,7 +18,9 @@ postconf -e "message_size_limit = 10485760" "smtpd_recipient_limit = 20" "smtp_d
 postconf -e "smtpd_tls_security_level = may" "smtpd_tls_cert_file = $cert/fullchain.pem" "smtpd_tls_key_file = $cert/privkey.pem" "smtpd_tls_protocols = >=TLSv1.2" "smtpd_tls_loglevel = 1"
 postconf -e "smtp_tls_security_level = none" "smtpd_milters = inet:rspamd:11332" "non_smtpd_milters =" "milter_protocol = 6" "milter_default_action = tempfail"
 postconf -e "maillog_file = /dev/stdout" "compatibility_level = 3.6" "smtputf8_enable = no" "maximal_queue_lifetime = 5d" "bounce_queue_lifetime = 1d"
-# Disable chroot: dynamic PostgreSQL libraries and Docker DNS must be visible.
+# Disable chroot for every service, including trivial-rewrite, which performs
+# relay-domain SQL lookups and needs Docker DNS/libpq outside the spool.
+postconf -F '*/*/chroot=n'
 postconf -M 'smtp/inet=smtp inet n - n - - smtpd'
 postconf -M 'relay/unix=relay unix - - n - - smtp'
 postconf -M 'smtp/unix=smtp unix - - n - - smtp'

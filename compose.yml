@@ -60,7 +60,13 @@ services:
     environment:
       <<: *app-env
       TRUST_PROXY_CIDRS: ${CADDY_EDGE_IP:-172.30.84.2}/32
-    networks: [internal, outbound, edge]
+    networks:
+      internal: {}
+      outbound: {}
+      edge:
+        # Reserve .2 for Caddy (the trusted reverse-proxy); avoid Compose
+        # auto-assigning the same address to the API container.
+        ipv4_address: ${API_EDGE_IP:-172.30.84.3}
     command: ["node","dist/apps/api/src/server.js"]
     healthcheck:
       test: ["CMD","node","-e","fetch('http://127.0.0.1:3001/api/v1/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]

@@ -69,6 +69,23 @@ describe("authentication and validation", () => {
     expect(record.id).toBe(accountId); expect(record).not.toHaveProperty("assignedIp"); expect(record).not.toHaveProperty("hasSession");
     expect((await request("POST", `/accounts/${accountId}/credentials/session/reveal`, v, { confirm: true })).statusCode).toBe(403);
   });
+  it("imports mailbox addresses and skips primary addresses and aliases on replay", async () => {
+    const addresses = ["import-check@alpha.test", "invalid-address", "import-check@alpha.test"];
+    const imported = await request("POST", "/mailboxes/import", ad, { addresses });
+    expect(imported.statusCode, imported.body).toBe(200);
+    expect(imported.json().items.map((item: any) => item.state)).toEqual(["created", "failed", "skipped"]);
+    const box = imported.json().items[0].mailbox;
+    expect(await receivingMailbox(db, addresses[0])).toHaveProperty("id", box.id);
+    await request("POST", `/mailboxes/${box.id}/aliases`, ad, { address: "import-alias@alpha.test" });
+    const replay = await request("POST", "/mailboxes/import", ad, {
+      addresses: [addresses[0], "import-alias@alpha.test"],
+    });
+    expect(replay.json().items.map((item: any) => item.state)).toEqual(["skipped", "skipped"]);
+    // Keep the shared test fixture unchanged for later assertions.
+    await db.query("DELETE FROM business_accounts WHERE mailbox_id=$1", [box.id]);
+    await db.query("DELETE FROM addresses WHERE mailbox_id=$1", [box.id]);
+    await db.query("DELETE FROM mailboxes WHERE id=$1", [box.id]);
+  });
 });
 describe("durable receive, parser and access", () => {
   const raw = Buffer.from([
@@ -137,6 +154,13 @@ describe("credentials and account tasks", () => {
     expect(await normalizeProxy("socks5://user:p%40ss@127.0.0.1:1080", true)).toBe("socks5://user:p%40ss@127.0.0.1:1080");
     expect(await normalizeProxy("http://127.0.0.1:80", true)).toBe("http://127.0.0.1:80");
     expect(await normalizeProxy("https://127.0.0.1:443", true)).toBe("https://127.0.0.1:443");
+  });
+  it("accepts public numeric proxies while rejecting private and IPv4-mapped addresses", async () => {
+    expect(await normalizeProxy("http://103.23.149.55:9")).toBe("http://103.23.149.55:9");
+    expect(await normalizeProxy("http://[2606:4700:4700::1111]:8080")).toBe("http://[2606:4700:4700::1111]:8080");
+    for (const host of ["10.0.0.1", "100.64.0.1", "192.168.1.1", "[fc00::1]", "[::ffff:103.23.149.55]"]) {
+      await expect(normalizeProxy(`http://${host}:8080`)).rejects.toThrow("代理必须使用可公开路由的地址");
+    }
   });
   it("authenticated encryption binds account and field", () => {
     const ciphertext = seal("secret", config.encryptionKey, "a:session");

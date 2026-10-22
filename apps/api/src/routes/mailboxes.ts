@@ -72,7 +72,7 @@ export async function mailboxRoutes(app: FastifyInstance, { db }: Context) {
     for (const input of req.body.addresses) {
       try {
         const address = normalizeEmail(input);
-        const [existing] = await db.query("SELECT id FROM addresses WHERE address=$1", [address]);
+        const [existing] = await db.query("SELECT address FROM addresses WHERE address=$1", [address]);
         if (existing) { items.push({ input, state: "skipped" }); continue; }
         items.push({ input, state: "created", mailbox: await createMailbox(db, user, { address }) });
       } catch (error) { items.push({ input, state: "failed", error: error instanceof Error ? error.message : "导入失败" }); }
